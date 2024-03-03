@@ -25,10 +25,10 @@ struct SphericalCoordinates {
 
 [[nodiscard]] inline glm::vec3 ToCartesianCoordinates(const SphericalCoordinates& spherical_coordinates) {
   const auto [radius, theta, phi] = spherical_coordinates;
-  const auto cos_phi = std::cosf(phi);
-  const auto x = radius * std::sinf(theta) * cos_phi;
-  const auto y = radius * std::sinf(-phi);
-  const auto z = radius * std::cosf(theta) * cos_phi;
+  const auto cos_phi = std::cos(phi);
+  const auto x = radius * std::sin(theta) * cos_phi;
+  const auto y = radius * std::sin(-phi);
+  const auto z = radius * std::cos(theta) * cos_phi;
   return glm::vec3{x, y, z};
 }
 
