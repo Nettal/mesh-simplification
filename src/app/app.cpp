@@ -1,4 +1,4 @@
-#include "app.h"  // NOLINT(build/include_subdir)
+#include "app/app.h"
 
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -14,11 +14,16 @@ constexpr auto kWindowHeight = 1080;
 gfx::ArcCamera CreateCamera(const float aspect_ratio) {
   static constexpr glm::vec3 kTarget{0.0f};
   static constexpr glm::vec3 kPosition{0.0f, 0.0f, 2.0f};
-  const gfx::ArcCamera::ViewFrustum view_frustum{.field_of_view_y = glm::radians(45.0f),
-                                                 .aspect_ratio = aspect_ratio,
-                                                 .z_near = 0.1f,
-                                                 .z_far = 100'000.0f};
-  return gfx::ArcCamera{kTarget, kPosition, view_frustum};
+  return gfx::ArcCamera{
+      kTarget,
+      kPosition,
+      // NOLINTBEGIN(*-magic-numbers)
+      gfx::ViewFrustum{.field_of_view_y = glm::radians(45.0f),
+                       .aspect_ratio = aspect_ratio,
+                       .z_near = 0.1f,
+                       .z_far = 100'000.0f}
+      // NOLINTEND(*-magic-numbers)
+  };
 }
 
 gfx::Mesh CreateMesh(const gfx::Device& device) {

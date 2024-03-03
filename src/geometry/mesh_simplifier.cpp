@@ -48,11 +48,13 @@ struct EdgeContraction {
                   const bool valid = true)
       : edge{edge}, vertex{vertex}, quadric{quadric}, cost{cost}, valid{valid} {}
 
+  // NOLINTBEGIN(misc-non-private-member-variables-in-classes)
   std::shared_ptr<gfx::HalfEdge> edge;
   std::shared_ptr<gfx::Vertex> vertex;
   glm::mat4 quadric;
   float cost;
   bool valid;
+  // NOLINTEND(misc-non-private-member-variables-in-classes)
 };
 
 /**
