@@ -11,6 +11,7 @@ namespace {
 constexpr auto kWindowWidth = 1920;
 constexpr auto kWindowHeight = 1080;
 
+// NOLINTBEGIN(*-magic-numbers)
 gfx::ArcCamera CreateCamera(const float aspect_ratio) {
   static constexpr glm::vec3 kTarget{0.0f};
   static constexpr glm::vec3 kPosition{0.0f, 0.0f, 2.0f};
@@ -24,13 +25,12 @@ gfx::ArcCamera CreateCamera(const float aspect_ratio) {
 
 gfx::Mesh CreateMesh(const gfx::Device& device) {
   auto mesh = gfx::obj_loader::LoadMesh(device, "assets/models/bunny.obj");
-  // NOLINTBEGIN(*-magic-numbers)
   mesh.Translate(glm::vec3{0.2f, -0.3f, 0.0f});
   mesh.Rotate(glm::vec3{1.0f, 0.0f, 0.0f}, glm::radians(10.0f));
   mesh.Scale(glm::vec3{0.35f});
-  // NOLINTEND(*-magic-numbers)
   return mesh;
 }
+// NOLINTEND(*-magic-numbers)
 
 }  // namespace
 

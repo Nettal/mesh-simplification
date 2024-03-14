@@ -1,7 +1,6 @@
 #include "graphics/memory.h"
 
 #include <algorithm>
-#include <cassert>
 #include <cstdint>
 #include <ranges>
 #include <stdexcept>
@@ -57,7 +56,6 @@ Memory& Memory::operator=(Memory&& memory) noexcept {
 void* Memory::Map() {
   if (mapped_memory_ == nullptr) {
     mapped_memory_ = device_.mapMemory(*memory_, 0, vk::WholeSize);
-    assert(mapped_memory_ != nullptr);
   }
   return mapped_memory_;
 }

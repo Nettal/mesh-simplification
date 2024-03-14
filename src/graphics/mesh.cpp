@@ -1,7 +1,5 @@
 #include "graphics/mesh.h"
 
-#include <cassert>
-
 #include "graphics/device.h"
 
 namespace {
@@ -39,8 +37,6 @@ Mesh::Mesh(const Device& device,
       indices_{indices},
       transform_{transform},
       vertex_buffer_{CreateDeviceLocalBuffer(device, vk::BufferUsageFlagBits::eVertexBuffer, vertices_)},
-      index_buffer_{CreateDeviceLocalBuffer(device, vk::BufferUsageFlagBits::eIndexBuffer, indices_)} {
-  assert(indices_.size() % 3 == 0);
-}
+      index_buffer_{CreateDeviceLocalBuffer(device, vk::BufferUsageFlagBits::eIndexBuffer, indices_)} {}
 
 }  // namespace gfx
