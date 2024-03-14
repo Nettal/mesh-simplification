@@ -142,10 +142,10 @@ vk::UniquePipeline CreateGraphicsPipeline(const vk::Device device,
                                           const vk::SampleCountFlagBits msaa_sample_count,
                                           const vk::PipelineLayout pipeline_layout,
                                           const vk::RenderPass render_pass) {
-  const std::filesystem::path vertex_shader_filepath{"assets/shaders/mesh.vert"};
+  const std::filesystem::path vertex_shader_filepath{"../../../src/app/assets/shaders/mesh.vert"};
   const gfx::ShaderModule vertex_shader_module{device, vk::ShaderStageFlagBits::eVertex, vertex_shader_filepath};
 
-  const std::filesystem::path fragment_shader_filepath{"assets/shaders/mesh.frag"};
+  const std::filesystem::path fragment_shader_filepath{"../../../src/app/assets/shaders/mesh.frag"};
   const gfx::ShaderModule fragment_shader_module{device, vk::ShaderStageFlagBits::eFragment, fragment_shader_filepath};
 
   const std::array shader_stage_create_info{

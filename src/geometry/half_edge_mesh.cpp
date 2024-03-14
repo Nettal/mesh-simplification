@@ -7,6 +7,7 @@
 #include <vector>
 
 #include <glm/glm.hpp>
+#include <iostream>
 
 #include "geometry/face.h"
 #include "geometry/half_edge.h"
@@ -140,7 +141,8 @@ void AttachIncidentEdges(const gfx::Vertex& v_target,
                          const gfx::Vertex& v_end,
                          const std::shared_ptr<gfx::Vertex>& v_new,
                          std::unordered_map<std::size_t, std::shared_ptr<gfx::HalfEdge>>& edges,
-                         std::unordered_map<std::size_t, std::shared_ptr<gfx::Face>>& faces) {
+                         std::unordered_map<std::size_t, std::shared_ptr<gfx::Face>>& faces,
+                         int& triangleCount) {
   const auto& edge_start = Get(hash_value(v_target, v_start), edges);
   const auto& edge_end = Get(hash_value(v_target, v_end), edges);
 
@@ -153,7 +155,7 @@ void AttachIncidentEdges(const gfx::Vertex& v_target,
 
     auto face_new = CreateTriangle(v_new, vi, vj, edges);
     faces.emplace(hash_value(*face_new), std::move(face_new));
-
+    triangleCount++;
     Delete(*edge0i->face(), faces);
     Delete(*edge0i, edges);
 
@@ -211,10 +213,10 @@ void HalfEdgeMesh::Contract(const HalfEdge& edge01, const std::shared_ptr<Vertex
   const auto v1 = edge01.vertex();
   const auto v0_next = edge10->next()->vertex();
   const auto v1_next = edge01.next()->vertex();
-
-  AttachIncidentEdges(*v0, *v1_next, *v0_next, v_new, edges_, faces_);
-  AttachIncidentEdges(*v1, *v0_next, *v1_next, v_new, edges_, faces_);
-
+  int triangle_count = 0;
+  AttachIncidentEdges(*v0, *v1_next, *v0_next, v_new, edges_, faces_, triangle_count);
+  AttachIncidentEdges(*v1, *v0_next, *v1_next, v_new, edges_, faces_, triangle_count);
+  std::cout << "Triangle count: " << triangle_count << '\n';
   Delete(*edge01.face(), faces_);
   Delete(*edge10->face(), faces_);
 

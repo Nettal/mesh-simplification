@@ -29,7 +29,7 @@ gfx::ArcCamera CreateCamera(const float aspect_ratio) {
 gfx::Mesh CreateMesh(const gfx::Device& device) {
   static constexpr glm::vec3 kTranslation{0.2f, -0.3f, 0.0f};
   static constexpr glm::vec3 kScale{0.35f};
-  auto mesh = gfx::obj_loader::LoadMesh(device, "assets/models/bunny.obj");
+  auto mesh = gfx::obj_loader::LoadMesh(device, "../../../src/app/assets/models/bunny.obj");
   mesh.Translate(kTranslation);
   mesh.Scale(kScale);
   return mesh;
@@ -65,7 +65,7 @@ void App::HandleKeyEvent(const int key, const int action) {
       window_.Close();
       break;
     case GLFW_KEY_S: {
-      static constexpr auto kSimplificationRate = 0.5f;
+      static constexpr auto kSimplificationRate = 0.8f;
       mesh_ = mesh::Simplify(engine_.device(), mesh_, kSimplificationRate);
       break;
     }

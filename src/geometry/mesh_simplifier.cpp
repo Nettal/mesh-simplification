@@ -138,6 +138,9 @@ bool WillDegenerate(const std::shared_ptr<gfx::HalfEdge>& edge01) {
 
   for (auto iterator = edge01->flip()->next(); iterator != edge01; iterator = iterator->flip()->next()) {
     if (const auto vertex = iterator->vertex(); neighborhood.contains(vertex->id())) {
+      for (const auto& item : neighborhood){
+        std::cout << " " << item.second->position().x<<" " << item.second->position().y<< " " << item.second->position().z << '\n';
+      }
       return true;
     }
   }
@@ -192,8 +195,9 @@ Mesh mesh::Simplify(const Device& device, const Mesh& mesh, const float rate) {
     return edge_contractions.empty() || face_count < target_face_count;
   };
 
-  for (auto next_vertex_id = half_edge_mesh.vertices().size(); !is_simplified(); edge_contractions.pop()) {
+  for (auto next_vertex_id = half_edge_mesh.vertices().size(); !is_simplified();) {
     const auto& edge_contraction = edge_contractions.top();
+    edge_contractions.pop();
     const auto& edge01 = edge_contraction->edge;
     if (!edge_contraction->valid || WillDegenerate(edge01)) continue;
 
