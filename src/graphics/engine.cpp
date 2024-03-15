@@ -1,7 +1,6 @@
 #include "graphics/engine.h"
 
 #include <algorithm>
-#include <cassert>
 #include <filesystem>
 #include <limits>
 #include <ranges>
@@ -32,8 +31,6 @@ vk::SampleCountFlagBits GetMsaaSampleCount(const vk::PhysicalDeviceLimits& physi
       return sample_count_flag_bit;
     }
   }
-
-  assert(color_depth_sample_count_flags & e1);
   return e1;
 }
 
@@ -242,7 +239,7 @@ vk::UniquePipeline CreateGraphicsPipeline(const vk::Device device,
                                      .subpass = 0});
   vk::resultCheck(result, "Graphics pipeline creation failed");
 
-  return std::move(graphics_pipeline);  // return value optimization not available here
+  return std::move(graphics_pipeline);
 }
 
 vk::UniqueCommandPool CreateCommandPool(const gfx::Device& device) {

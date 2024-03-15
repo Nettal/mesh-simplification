@@ -1,7 +1,6 @@
 #include "graphics/window.h"
 
 #include <algorithm>
-#include <cassert>
 #include <format>
 #include <iostream>
 #include <print>
@@ -54,17 +53,15 @@ UniqueGlfwWindow CreateGlfwWindow(const char* const title, int width, int height
   glfwWindowHint(GLFW_BLUE_BITS, video_mode->blueBits);
   glfwWindowHint(GLFW_REFRESH_RATE, video_mode->refreshRate);
 
-  assert(width > 0);
-  assert(height > 0);
   width = std::min(width, video_mode->width);
   height = std::min(height, video_mode->height);
 
   auto* window = glfwCreateWindow(width, height, title, nullptr, nullptr);
   if (window == nullptr) throw std::runtime_error{"GLFW window creation failed"};
 
-  const auto x = (video_mode->width - width) / 2;
-  const auto y = (video_mode->height - height) / 2;
-  glfwSetWindowPos(window, x, y);
+  const auto center_x = (video_mode->width - width) / 2;
+  const auto center_y = (video_mode->height - height) / 2;
+  glfwSetWindowPos(window, center_x, center_y);
 
   return UniqueGlfwWindow{window, glfwDestroyWindow};
 }
@@ -112,8 +109,7 @@ std::pair<int, int> Window::GetFramebufferSize() const noexcept {
 
 float Window::GetAspectRatio() const noexcept {
   const auto [width, height] = GetSize();
-  assert(height > 0);
-  return static_cast<float>(width) / static_cast<float>(height);
+  return height == 0 ? 0.0f : static_cast<float>(width) / static_cast<float>(height);
 }
 
 #ifdef GLFW_INCLUDE_VULKAN

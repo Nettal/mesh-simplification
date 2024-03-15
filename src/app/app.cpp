@@ -11,29 +11,26 @@ namespace {
 constexpr auto kWindowWidth = 1920;
 constexpr auto kWindowHeight = 1080;
 
+// NOLINTBEGIN(*-magic-numbers)
 gfx::ArcCamera CreateCamera(const float aspect_ratio) {
   static constexpr glm::vec3 kTarget{0.0f};
   static constexpr glm::vec3 kPosition{0.0f, 0.0f, 2.0f};
-  return gfx::ArcCamera{
-      kTarget,
-      kPosition,
-      // NOLINTBEGIN(*-magic-numbers)
-      gfx::ViewFrustum{.field_of_view_y = glm::radians(45.0f),
-                       .aspect_ratio = aspect_ratio,
-                       .z_near = 0.1f,
-                       .z_far = 100'000.0f}
-      // NOLINTEND(*-magic-numbers)
-  };
+  return gfx::ArcCamera{kTarget,
+                        kPosition,
+                        gfx::ViewFrustum{.field_of_view_y = glm::radians(45.0f),
+                                         .aspect_ratio = aspect_ratio,
+                                         .z_near = 0.1f,
+                                         .z_far = 100'000.0f}};
 }
 
 gfx::Mesh CreateMesh(const gfx::Device& device) {
-  static constexpr glm::vec3 kTranslation{0.2f, -0.3f, 0.0f};
-  static constexpr glm::vec3 kScale{0.35f};
-  auto mesh = gfx::obj_loader::LoadMesh(device, "../../../src/app/assets/models/bunny.obj");
-  mesh.Translate(kTranslation);
-  mesh.Scale(kScale);
+  auto mesh = gfx::obj_loader::LoadMesh(device, "assets/models/bunny.obj");
+  mesh.Translate(glm::vec3{0.2f, -0.3f, 0.0f});
+  mesh.Rotate(glm::vec3{1.0f, 0.0f, 0.0f}, glm::radians(10.0f));
+  mesh.Scale(glm::vec3{0.35f});
   return mesh;
 }
+// NOLINTEND(*-magic-numbers)
 
 }  // namespace
 
@@ -65,7 +62,7 @@ void App::HandleKeyEvent(const int key, const int action) {
       window_.Close();
       break;
     case GLFW_KEY_S: {
-      static constexpr auto kSimplificationRate = 0.8f;
+      static constexpr auto kSimplificationRate = 0.5f;
       mesh_ = mesh::Simplify(engine_.device(), mesh_, kSimplificationRate);
       break;
     }
