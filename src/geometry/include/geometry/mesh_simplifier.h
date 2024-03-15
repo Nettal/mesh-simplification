@@ -2,6 +2,7 @@
 #define SRC_GEOMETRY_INCLUDE_GEOMETRY_MESH_SIMPLIFIER_H_
 
 #include "glm/glm.hpp"
+#include "half_edge_mesh.h"
 #include "unordered_map"
 #include "vertex.h"
 
@@ -11,7 +12,7 @@ class Mesh;
 
 namespace mesh {
 
-using vec3_mat4_map = std::unordered_map<glm::vec3, glm::mat4, Vertex::Vec3Hash, Vertex::Vec3Equal>;
+using vec3_mat4_map = vec3_map<glm::mat4>;
 /**
  * \brief Reduces the number of triangles in a mesh.
  * \param device The graphics device used to load the reconstructed mesh data into GPU memory.

@@ -25,7 +25,9 @@ class Vertex;
  *          just these four pointers, one can effectively traverse and modify edges in a triangle mesh.
  */
 
-using vec3_vertex_map = std::unordered_map<glm::vec3, gfx::ProcessingVertex, Vertex::Vec3Hash, Vertex::Vec3Equal>;
+template <typename T>
+using vec3_map = std::unordered_map<glm::vec3, T, Vertex::Vec3Hash, Vertex::Vec3Equal>;
+using vec3_vertex_map = vec3_map<gfx::ProcessingVertex>;
 using face_set = std::unordered_set<gfx::Face, FaceHash, FaceEqual>;
 class HalfEdgeMesh {
 public:
