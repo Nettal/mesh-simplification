@@ -1,6 +1,8 @@
 add_library(geometry STATIC face.cpp
                             half_edge_mesh.cpp
-                            mesh_simplifier.cpp)
+                            mesh_simplifier.cpp
+        include/geometry/HalfEdgeKey.cpp
+        include/geometry/HalfEdgeKey.h)
 
 find_package(glm CONFIG REQUIRED)
 

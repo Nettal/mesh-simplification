@@ -18,151 +18,17 @@
 namespace {
 
 /**
- * \brief Finds a hashable item in an unordered map.
- * \param key The hash value or item to be hashed before searching the unordered map.
- * \param map The unordered map to search.
- * \return A constant iterator to the item in the unordered map if it exists.
- */
-template <typename Key, typename MapKey, typename MapValue>
-typename std::unordered_map<MapKey, MapValue>::const_iterator Find(const Key& key,
-                                                                   const std::unordered_map<MapKey, MapValue>& map) {
-  if constexpr (std::is_same_v<Key, MapKey>) {
-    return map.find(key);
-  } else {
-    return map.find(hash_value(key));
-  }
-}
-
-/**
- * \brief Gets a hashable item in an unordered map.
- * \param key The hash value or item to be hashed before searching the unordered map.
- * \param map The unordered map to get from.
- * \return A constant reference to the item in the unordered map.
- */
-template <typename Key, typename MapKey, typename MapValue>
-const MapValue& Get(const Key& key, const std::unordered_map<MapKey, MapValue>& map) {
-  const auto iterator = Find(key, map);
-  assert(iterator != map.cend());
-  return iterator->second;
-}
-
-/**
- * \brief Deletes a hashable item in an unordered map.
- * \param key The hash value or item to be hashed before searching the unordered map.
- * \param map The unordered map to delete from.
- */
-template <typename Key, typename MapKey, typename MapValue>
-void Delete(const Key& key, std::unordered_map<MapKey, MapValue>& map) {
-  if constexpr (std::is_same_v<Key, gfx::HalfEdge>) {
-    // hash values depend on both edges so they must be calculated first before deleting
-    const auto edge_key = hash_value(key);
-    const auto edge_flip_key = hash_value(*key.flip());
-    Delete(edge_key, map);
-    Delete(edge_flip_key, map);
-  } else {
-    const auto iterator = Find(key, map);
-    assert(iterator != map.cend());
-    map.erase(iterator);
-  }
-}
-
-/**
- * \brief Creates a new half-edge and its associated flip edge.
- * \param v0,v1 The half-edge vertices.
- * \param edges The mesh half-edges by hash value.
- * \return The half-edge connecting vertex \p v0 to \p v1.
- */
-std::shared_ptr<gfx::HalfEdge> CreateHalfEdge(const std::shared_ptr<gfx::Vertex>& v0,
-                                              const std::shared_ptr<gfx::Vertex>& v1,
-                                              std::unordered_map<std::size_t, std::shared_ptr<gfx::HalfEdge>>& edges) {
-  const auto edge01_key = hash_value(*v0, *v1);
-  const auto edge10_key = hash_value(*v1, *v0);
-
-  // prevent the creation of duplicate edges
-  if (const auto iterator = edges.find(edge01_key); iterator != edges.cend()) {
-    assert(edges.contains(edge10_key));
-    return iterator->second;
-  }
-  assert(!edges.contains(edge10_key));
-
-  auto edge01 = std::make_shared<gfx::HalfEdge>(v1);
-  auto edge10 = std::make_shared<gfx::HalfEdge>(v0);
-
-  edge01->set_flip(edge10);
-  edge10->set_flip(edge01);
-
-  edges.emplace(edge01_key, edge01);
-  edges.emplace(edge10_key, std::move(edge10));
-
-  return edge01;
-}
-
-/**
  * \brief Creates a new triangle in the half-edge mesh.
  * \param v0,v1,v2 The triangle vertices in counter-clockwise order.
  * \param edges A mesh half-edges by hash value.
  * \return A triangle face constructed from the vertices \p v0, \p v1, \p v2.
  */
-std::shared_ptr<gfx::Face> CreateTriangle(const std::shared_ptr<gfx::Vertex>& v0,
-                                          const std::shared_ptr<gfx::Vertex>& v1,
-                                          const std::shared_ptr<gfx::Vertex>& v2,
-                                          std::unordered_map<std::size_t, std::shared_ptr<gfx::HalfEdge>>& edges) {
-  const auto edge01 = CreateHalfEdge(v0, v1, edges);
-  const auto edge12 = CreateHalfEdge(v1, v2, edges);
-  const auto edge20 = CreateHalfEdge(v2, v0, edges);
-
-  v0->set_edge(edge20);
-  v1->set_edge(edge01);
-  v2->set_edge(edge12);
-
-  edge01->set_next(edge12);
-  edge12->set_next(edge20);
-  edge20->set_next(edge01);
-
-  auto face012 = std::make_shared<gfx::Face>(v0, v1, v2);
-  edge01->set_face(face012);
-  edge12->set_face(face012);
-  edge20->set_face(face012);
-
-  return face012;
-}
-
-/**
- * \brief Attaches edges incident to a vertex to a new vertex.
- * \param v_target The vertex whose incident edges should be updated.
- * \param v_start The vertex opposite of \p v_target representing the first half-edge to process.
- * \param v_end The vertex opposite of \p v_target representing the last half-edge to process.
- * \param v_new The new vertex to attach edges to.
- * \param edges The mesh half-edges by hash value.
- * \param faces The mesh faces by hash value.
- */
-void AttachIncidentEdges(const gfx::Vertex& v_target,
-                         const gfx::Vertex& v_start,
-                         const gfx::Vertex& v_end,
-                         const std::shared_ptr<gfx::Vertex>& v_new,
-                         std::unordered_map<std::size_t, std::shared_ptr<gfx::HalfEdge>>& edges,
-                         std::unordered_map<std::size_t, std::shared_ptr<gfx::Face>>& faces,
-                         int& triangleCount) {
-  const auto& edge_start = Get(hash_value(v_target, v_start), edges);
-  const auto& edge_end = Get(hash_value(v_target, v_end), edges);
-
-  for (auto edge0i = edge_start; edge0i != edge_end;) {
-    const auto edgeij = edge0i->next();
-    const auto edgej0 = edgeij->next();
-
-    const auto vi = edge0i->vertex();
-    const auto vj = edgeij->vertex();
-
-    auto face_new = CreateTriangle(v_new, vi, vj, edges);
-    faces.emplace(hash_value(*face_new), std::move(face_new));
-    triangleCount++;
-    Delete(*edge0i->face(), faces);
-    Delete(*edge0i, edges);
-
-    edge0i = edgej0->flip();
-  }
-
-  Delete(*edge_end, edges);
+gfx::Face CreateTriangle(gfx::Vertex a, gfx::Vertex b, gfx::Vertex c, gfx::vec3_vertex_map& vertices) {
+  gfx::Face face(a, b, c);
+  vertices.at(a.position()).addFace(face);
+  vertices.at(b.position()).addFace(face);
+  vertices.at(c.position()).addFace(face);
+  return face;
 }
 
 /**
@@ -170,14 +36,11 @@ void AttachIncidentEdges(const gfx::Vertex& v_target,
  * \param v0 The vertex to compute the normal for.
  * \return The weighted vertex normal.
  */
-glm::vec3 AverageVertexNormals(const gfx::Vertex& v0) {
+glm::vec3 AverageVertexNormals(const gfx::ProcessingVertex& v0) {
   glm::vec3 normal{0.0f};
-  auto edgei0 = v0.edge();
-  do {
-    const auto& face = edgei0->face();
-    normal += face->normal() * face->area();
-    edgei0 = edgei0->next()->flip();
-  } while (edgei0 != v0.edge());
+  for (const auto& item : v0.faces()) {
+    normal += item.normal() * item.area();
+  }
   return glm::normalize(normal);
 }
 
@@ -185,47 +48,158 @@ glm::vec3 AverageVertexNormals(const gfx::Vertex& v0) {
 
 namespace gfx {
 
+HalfEdgeMesh::TriangleInfo HalfEdgeMesh::collectTriangle(HalfEdgeKey edge) {
+  ProcessingVertex vertexA = vertices_.at(edge.pos());
+  ProcessingVertex vertexB = vertices_.at(edge.posTo());
+  std::vector<Face> disappear{};
+  std::vector<Face> influenceA{};
+  std::vector<Face> influenceB{};
+  face_set allTriangle;
+  for (const var& item : vertexB.faces()) {
+    allTriangle.insert(item);
+  }
+  for (const var& item : vertexA.faces()) {
+    allTriangle.insert(item);
+  }
+  for (var triangle : allTriangle) {
+    ProcessingVertex *a = null, *b = null;
+    for (auto vertex : triangle.vertex()) {
+      if (vertex.position() == vertexA.pos()) a = &vertexA;
+      if (vertex.position() == vertexB.pos()) b = &vertexB;
+    }
+    if (a != null && b != null) {
+      disappear.emplace_back(triangle);
+      continue;
+    }
+    if (a != null) {
+      influenceA.emplace_back(triangle);
+      continue;
+    }
+    if (b != null) {
+      influenceB.emplace_back(triangle);
+      continue;
+    }
+    assert(0);
+  }
+  return TriangleInfo(disappear, influenceA, vertexA.pos(), influenceB, vertexB.pos());
+}
 HalfEdgeMesh::HalfEdgeMesh(const Mesh& mesh)
     : vertices_{mesh.vertices()  //
                 | std::views::transform([id = 0u](const auto& mesh_vertex) mutable {
-                    auto vertex = std::make_shared<Vertex>(id, mesh_vertex.position);
-                    return std::pair{id++, std::move(vertex)};
+                    auto vertex = ProcessingVertex(mesh_vertex.position);
+                    return std::pair{vertex.pos(), vertex};
                   })
-                | std::ranges::to<std::unordered_map>()},
+                | std::ranges::to<vec3_vertex_map>()},
       faces_{mesh.indices()          //
              | std::views::chunk(3)  //
-             | std::views::transform([this](const auto& index_group) {
-                 const auto& v0 = Get(index_group[0], vertices_);
-                 const auto& v1 = Get(index_group[1], vertices_);
-                 const auto& v2 = Get(index_group[2], vertices_);
-                 auto face012 = CreateTriangle(v0, v1, v2, edges_);
-                 return std::pair{hash_value(*face012), std::move(face012)};
+             | std::views::transform([this, &mesh](const auto& index_group) {
+                 auto a = mesh.vertices().at(index_group[0]);
+                 auto b = mesh.vertices().at(index_group[1]);
+                 auto c = mesh.vertices().at(index_group[2]);
+                 auto aa = gfx::Vertex(a.position);
+                 auto bb = gfx::Vertex(b.position);
+                 auto cc = gfx::Vertex(c.position);
+                 auto face012 = CreateTriangle(aa, bb, cc, vertices_);
+                 return face012;
                })
-             | std::ranges::to<std::unordered_map>()},
+             | std::ranges::to<face_set>()},
       transform_{mesh.transform()} {}
 
-void HalfEdgeMesh::Contract(const HalfEdge& edge01, const std::shared_ptr<Vertex>& v_new) {
-  assert(Find(edge01, edges_) != edges_.cend());
-  assert(Find(v_new->id(), vertices_) == vertices_.cend());
+template <typename T>
+void removeAll(std::vector<T>& source, const std::vector<T>& elementsToRemove) {
+  source.erase(std::remove_if(source.begin(),
+                              source.end(),
+                              [&](const T& element) {
+                                for (const auto& item : elementsToRemove) {
+                                  if (item == element) {
+                                    return true;
+                                  }
+                                }
+                                return false;
+                              }),
+               source.end());
+}
+using Vec3f = glm::vec3;
+using Vec2f = glm::vec2;
+std::vector<HalfEdgeKey> removeTriangle(Face triangle, HalfEdgeMesh& halfEdgeMesh) {
+  halfEdgeMesh.faces().erase(triangle);
+  for (var vertex : triangle.vertex()) {
+    halfEdgeMesh.vertices().at(vertex.position()).removeFace(triangle);
+  }
+  return triangle.edges();
+}
 
-  const auto edge10 = edge01.flip();
-  const auto v0 = edge10->vertex();
-  const auto v1 = edge01.vertex();
-  const auto v0_next = edge10->next()->vertex();
-  const auto v1_next = edge01.next()->vertex();
-  int triangle_count = 0;
-  AttachIncidentEdges(*v0, *v1_next, *v0_next, v_new, edges_, faces_, triangle_count);
-  AttachIncidentEdges(*v1, *v0_next, *v1_next, v_new, edges_, faces_, triangle_count);
-  std::cout << "Triangle count: " << triangle_count << '\n';
-  Delete(*edge01.face(), faces_);
-  Delete(*edge10->face(), faces_);
+struct TriangleUpdater {
+  Face triangle;
+  Vec3f oldPos;
+  Vec3f newPos;
+  HalfEdgeKey edge;
+  HalfEdgeMesh& halfEdgeMesh;
+  TriangleUpdater(Face triangle, Vec3f oldPos, Vec3f newPos, HalfEdgeMesh& halfEdgeMesh)
+      : triangle(triangle), oldPos(oldPos), newPos(newPos), edge({0, 0, 0}, {0, 0, 0}), halfEdgeMesh(halfEdgeMesh) {
+    std::vector<HalfEdgeKey> removed;
+    std::vector<HalfEdgeKey> triangleEdges = triangle.edges();
+    for (var e : triangle.edges()) {
+      if (e.pos() == oldPos || e.posTo() == oldPos) {
+        // old edge
+        removed.emplace_back(e);
+      }
+    }
+    removeAll(triangleEdges, removed);
+    assert(triangleEdges.size() == 1);
+    // the remain edge
+    edge = triangleEdges[0];
+  }
+  std::vector<HalfEdgeKey> removeOldTriangle() { return removeTriangle(triangle, halfEdgeMesh); }
 
-  Delete(edge01, edges_);
+  Face buildNewTriangle() {
+    auto a = edge.pos();
+    auto b = edge.posTo();
+    auto c = newPos;
+    auto f = Face(Vertex(a), Vertex(b), Vertex(c));
+    halfEdgeMesh.vertices().at(a).addFace(f);
+    halfEdgeMesh.vertices().at(b).addFace(f);
+    halfEdgeMesh.vertices().at(c).addFace(f);
+    return f;
+  }
+};
 
-  Delete(v0->id(), vertices_);
-  Delete(v1->id(), vertices_);
+HalfEdgeMesh::ContractInfo HalfEdgeMesh::Contract(HalfEdgeKey edge01, glm::vec3 v_new) {
+  assert(!vertices_.contains(v_new));
+  assert(vertices_.contains(edge01.pos()));
+  assert(vertices_.contains(edge01.posTo()));
+  assert(v_new != edge01.pos());
+  assert(v_new != edge01.posTo());
 
-  vertices_.emplace(v_new->id(), v_new);
+  vertices_.emplace(v_new, ProcessingVertex(v_new));
+  var triangle = collectTriangle(edge01);
+  std::vector<TriangleUpdater> triangle_updaters;
+  std::vector<HalfEdgeKey> removed;
+  for (const auto& item : triangle.influenceA) triangle_updaters.emplace_back(item, triangle.posA, v_new, *this);
+  for (const auto& item : triangle.influenceB) triangle_updaters.emplace_back(item, triangle.posB, v_new, *this);
+
+  for (auto& item : triangle_updaters) {
+    for (auto& i : item.removeOldTriangle()) removed.emplace_back(i);
+  }
+
+  for (auto& item : triangle.disappear) {
+    for (auto& i : removeTriangle(item, *this)) {
+      removed.emplace_back(i);
+    }
+  }
+
+  std::vector<Face> newFace;
+
+  for (auto& item : triangle_updaters) {
+    const Face& newTriangle = item.buildNewTriangle();
+    faces_.insert(newTriangle);
+
+    newFace.emplace_back(newTriangle);
+  }
+
+  vertices_.erase(edge01.pos());
+  vertices_.erase(edge01.posTo());
+  return {removed, newFace};
 }
 
 Mesh HalfEdgeMesh::ToMesh(const Device& device) const {
@@ -235,18 +209,19 @@ Mesh HalfEdgeMesh::ToMesh(const Device& device) const {
   std::vector<std::uint32_t> indices;
   indices.reserve(3 * faces_.size());
 
-  std::unordered_map<std::uint32_t, std::uint32_t> index_map;
+  std::unordered_map<Vec3f, std::uint32_t, Vertex::Vec3Hash, Vertex::Vec3Equal> index_map;
   index_map.reserve(vertices_.size());
 
-  for (std::uint32_t index = 0; const auto& vertex : vertices_ | std::views::values) {
-    vertices.push_back(Mesh::Vertex{.position = vertex->position(), .normal = AverageVertexNormals(*vertex)});
-    index_map.emplace(vertex->id(), index++);  // map original vertex IDs to new index positions
+  for (std::uint32_t index = 0; auto& v : vertices_ | std::views::values) {
+    const Vec3f& pos = v.pos();
+    vertices.push_back(Mesh::Vertex{.position = pos, .normal = AverageVertexNormals(v)});
+    index_map.emplace(pos, index++);  // map original vertex IDs to new index positions
   }
 
-  for (const auto& face : faces_ | std::views::values) {
-    indices.push_back(Get(face->v0()->id(), index_map));
-    indices.push_back(Get(face->v1()->id(), index_map));
-    indices.push_back(Get(face->v2()->id(), index_map));
+  for (const auto& face : faces_) {
+    indices.push_back(index_map.at(face.a_.position()));
+    indices.push_back(index_map.at(face.b_.position()));
+    indices.push_back(index_map.at(face.c_.position()));
   }
 
   return Mesh{device, vertices, indices, transform_};

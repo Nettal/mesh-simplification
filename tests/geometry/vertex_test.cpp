@@ -23,7 +23,7 @@ TEST(VertexTest, GetUnsetIdCausesProgramExit) {
 TEST(VertexTest, GetExpiredEdgeCausesProgramExit) {
   const auto vertex = std::make_shared<gfx::Vertex>(0, glm::vec3{0.0f});
   {
-    const auto edge = std::make_shared<gfx::HalfEdge>(vertex);
+    const auto edge = std::make_shared<gfx::ProcessingVertex>(vertex);
     vertex->set_edge(edge);
   }
   EXPECT_DEATH({ std::ignore = vertex->edge(); }, "");

@@ -41,16 +41,16 @@ struct EdgeContraction {
    *              duplicated entries may be inserted in the queue and this property will be used to determine if an
    *              entry refers to the most recent edge update.
    */
-  EdgeContraction(const std::shared_ptr<gfx::HalfEdge>& edge,
-                  const std::shared_ptr<gfx::Vertex>& vertex,
+  EdgeContraction(const gfx::HalfEdgeKey& edge,
+                  const glm::vec3 newPos,
                   const glm::mat4& quadric,
                   const float cost,
                   const bool valid = true)
-      : edge{edge}, vertex{vertex}, quadric{quadric}, cost{cost}, valid{valid} {}
+      : edge{edge}, newPos{newPos}, quadric{quadric}, cost{cost}, valid{valid} {}
 
   // NOLINTBEGIN(misc-non-private-member-variables-in-classes)
-  std::shared_ptr<gfx::HalfEdge> edge;
-  std::shared_ptr<gfx::Vertex> vertex;
+  gfx::HalfEdgeKey edge;
+  glm::vec3 newPos;
   glm::mat4 quadric;
   float cost;
   bool valid;
@@ -58,30 +58,18 @@ struct EdgeContraction {
 };
 
 /**
- * \brief Gets a canonical representation of a half-edge used to disambiguate between its flip edge.
- * \param edge01 The half-edge to disambiguate.
- * \return For two vertices connected by an edge, returns the half-edge pointing to the vertex with the smallest ID.
- */
-std::shared_ptr<gfx::HalfEdge> GetMinEdge(const std::shared_ptr<gfx::HalfEdge>& edge01) {
-  const auto edge10 = edge01->flip();
-  return edge01->vertex()->id() < edge10->vertex()->id() ? edge01 : edge10;
-}
-
-/**
  * \brief Creates an error quadric for a given vertex.
  * \param v0 The vertex to create an error quadric for.
  * \return The error quadric for \p v0.
  */
-glm::mat4 CreateErrorQuadric(const gfx::Vertex& v0) {
+glm::mat4 CreateErrorQuadric(const gfx::ProcessingVertex& v0) {
   glm::mat4 quadric{0.0f};
-  auto edgei0 = v0.edge();
-  do {
-    const auto& position = v0.position();
-    const auto& normal = edgei0->face()->normal();
-    const glm::vec4 plane{normal, -glm::dot(position, normal)};
+  auto pos = v0.pos();
+  for (const auto& item : v0.faces()) {
+    auto normal = item.normal();
+    const glm::vec4 plane{normal, -glm::dot(pos, normal)};
     quadric += glm::outerProduct(plane, plane);
-    edgei0 = edgei0->next()->flip();
-  } while (edgei0 != v0.edge());
+  }
   return quadric;
 }
 
@@ -92,31 +80,26 @@ glm::mat4 CreateErrorQuadric(const gfx::Vertex& v0) {
  * \return An edge contraction candidate that includes the vertex whose position optimally preserves the original shape
  *         and its associated cost.
  */
-std::shared_ptr<EdgeContraction> CreateEdgeContraction(const std::shared_ptr<gfx::HalfEdge>& edge01,
-                                                       const std::unordered_map<std::uint32_t, glm::mat4>& quadrics) {
-  const auto v0 = edge01->flip()->vertex();
-  const auto q0_iterator = quadrics.find(v0->id());
-  assert(q0_iterator != quadrics.cend());
+EdgeContraction CreateEdgeContraction(const gfx::HalfEdgeKey& edge01, const gfx::mesh::vec3_mat4_map& quadrics) {
+  const auto v0 = edge01.pos();
 
-  const auto v1 = edge01->vertex();
-  const auto q1_iterator = quadrics.find(v1->id());
-  assert(q1_iterator != quadrics.cend());
+  const auto v1 = edge01.posTo();
 
-  const auto& q0 = q0_iterator->second;
-  const auto& q1 = q1_iterator->second;
+  const auto& q0 = quadrics.at(v0);
+  const auto& q1 = quadrics.at(v1);
   const auto q01 = q0 + q1;
 
   if (glm::determinant(q01) == 0.0f) {
     // average the edge vertices if the error quadric is not invertible
-    const auto position = (v0->position() + v1->position()) / 2.0f;
-    return std::make_shared<EdgeContraction>(edge01, std::make_shared<gfx::Vertex>(position), q01, 0.0f);
+    const auto position = (v0 + v1) / 2.0f;
+    return {edge01, position, q01, 0.0f};
   }
 
   auto position = glm::inverse(q01) * glm::vec4{0.0f, 0.0f, 0.0f, 1.0f};
   position /= position.w;
 
   const auto squared_distance = glm::dot(position, q01 * position);
-  return std::make_shared<EdgeContraction>(edge01, std::make_shared<gfx::Vertex>(position), q01, squared_distance);
+  return {edge01, position, q01, squared_distance};
 }
 
 /**
@@ -124,27 +107,8 @@ std::shared_ptr<EdgeContraction> CreateEdgeContraction(const std::shared_ptr<gfx
  * \param edge01 The edge to evaluate.
  * \return \c true if the removal of \p edge01 will produce a non-manifold, otherwise \c false.
  */
-bool WillDegenerate(const std::shared_ptr<gfx::HalfEdge>& edge01) {
-  const auto v0 = edge01->flip()->vertex();
-  const auto v1_next = edge01->next()->vertex();
-  const auto v0_next = edge01->flip()->next()->vertex();
-  std::unordered_map<std::uint32_t, std::shared_ptr<gfx::Vertex>> neighborhood;
-
-  for (auto iterator = edge01->next(); iterator != edge01->flip(); iterator = iterator->flip()->next()) {
-    if (const auto vertex = iterator->vertex(); vertex != v0 && vertex != v1_next && vertex != v0_next) {
-      neighborhood.emplace(vertex->id(), vertex);
-    }
-  }
-
-  for (auto iterator = edge01->flip()->next(); iterator != edge01; iterator = iterator->flip()->next()) {
-    if (const auto vertex = iterator->vertex(); neighborhood.contains(vertex->id())) {
-      for (const auto& item : neighborhood){
-        std::cout << " " << item.second->position().x<<" " << item.second->position().y<< " " << item.second->position().z << '\n';
-      }
-      return true;
-    }
-  }
-
+bool WillDegenerate(const EdgeContraction& contraction, gfx::vec3_vertex_map& map) {
+  if (map.contains(contraction.newPos)) return true;
   return false;
 }
 
@@ -161,30 +125,31 @@ Mesh mesh::Simplify(const Device& device, const Mesh& mesh, const float rate) {
   HalfEdgeMesh half_edge_mesh{mesh};
 
   // compute error quadrics for each vertex in the mesh
-  std::unordered_map<std::uint32_t, glm::mat4> quadrics;
-  for (const auto& [id, vertex] : half_edge_mesh.vertices()) {
-    quadrics.emplace(id, CreateErrorQuadric(*vertex));
+  vec3_mat4_map quadrics;
+  for (const auto& [pos, vertex] : half_edge_mesh.vertices()) {
+    quadrics.emplace(pos, CreateErrorQuadric(vertex));
   }
 
   // use a priority queue to sort edge contraction candidates by the cost of removing each edge
-  static constexpr auto kSortByMinCost = [](const auto& lhs, const auto& rhs) { return lhs->cost > rhs->cost; };
-  std::priority_queue<std::shared_ptr<EdgeContraction>,
-                      std::vector<std::shared_ptr<EdgeContraction>>,
-                      decltype(kSortByMinCost)>
-      edge_contractions{kSortByMinCost};
+  static constexpr auto kSortByMinCost = [](const auto& lhs, const auto& rhs) { return lhs.cost > rhs.cost; };
+  std::priority_queue<EdgeContraction, std::vector<EdgeContraction>, decltype(kSortByMinCost)> edge_contractions{
+      kSortByMinCost};
 
   // this is used to invalidate existing priority queue entries as edges are updated or removed from the mesh
-  std::unordered_map<std::size_t, std::shared_ptr<EdgeContraction>> valid_edges;
+  using half_edge_conn_map = std::unordered_map<gfx::HalfEdgeKey,
+                                                EdgeContraction,
+                                                gfx::HalfEdgeKey::HalfEdgeKeyHash,
+                                                gfx::HalfEdgeKey::HalfEdgeKeyEqual>;
+  half_edge_conn_map valid_edges;
 
   // compute edge contraction candidates for each edge in the mesh
-  for (const auto& edge : half_edge_mesh.edges() | std::views::values) {
-    const auto min_edge = GetMinEdge(edge);
-    const auto min_edge_key = hash_value(*min_edge);
-
-    if (!valid_edges.contains(min_edge_key)) {
-      auto edge_contraction = CreateEdgeContraction(min_edge, quadrics);
-      edge_contractions.push(edge_contraction);
-      valid_edges.emplace(min_edge_key, std::move(edge_contraction));
+  for (const auto& face : half_edge_mesh.faces()) {
+    for (const auto& edge : face.edges()) {
+      if (!valid_edges.contains(edge) || valid_edges.contains(edge.swap())) {
+        auto edge_contraction = CreateEdgeContraction(edge, quadrics);
+        edge_contractions.push(edge_contraction);
+        valid_edges.emplace(edge, edge_contraction);
+      }
     }
   }
 
@@ -198,54 +163,48 @@ Mesh mesh::Simplify(const Device& device, const Mesh& mesh, const float rate) {
   for (auto next_vertex_id = half_edge_mesh.vertices().size(); !is_simplified();) {
     const auto& edge_contraction = edge_contractions.top();
     edge_contractions.pop();
-    const auto& edge01 = edge_contraction->edge;
-    if (!edge_contraction->valid || WillDegenerate(edge01)) continue;
+    const auto& edge01 = edge_contraction.edge;
+    if (WillDegenerate(edge_contraction, half_edge_mesh.vertices()) || !valid_edges.contains(edge01)) continue;
 
     // begin processing the next edge contraction
-    const auto& v_new = edge_contraction->vertex;
-    v_new->set_id(static_cast<std::uint32_t>(next_vertex_id++));
-    quadrics.emplace(v_new->id(), edge_contraction->quadric);
+    valid_edges.erase(edge01);
+    valid_edges.erase(edge01.swap());
 
-    // invalidate entries in the priority queue that will be removed during the edge contraction
-    for (const auto& vi : {edge01->flip()->vertex(), edge01->vertex()}) {
-      auto edgeji = vi->edge();
-      do {
-        const auto min_edge = GetMinEdge(edgeji);
-        if (const auto iterator = valid_edges.find(hash_value(*min_edge)); iterator != valid_edges.cend()) {
-          iterator->second->valid = false;
-          valid_edges.erase(iterator);
-        }
-        edgeji = edgeji->next()->flip();
-      } while (edgeji != vi->edge());
-    }
+    const auto& v_new = edge_contraction.newPos;
+    quadrics.emplace(v_new, edge_contraction.quadric);
 
     // remove the edge from the mesh and attach incident edges to the new vertex
-    half_edge_mesh.Contract(*edge01, v_new);
+    auto info = half_edge_mesh.Contract(edge01, v_new);
 
+    std::cout << "newFace" << info.newFaces.size() << '\n';
+    std::cout << "disappear" << info.disappear.size() << '\n';
+
+    for (const auto& item : info.disappear) {
+      valid_edges.erase(item);
+      valid_edges.erase(item.swap());
+    }
     // add new edge contraction candidates for edges affected by the edge contraction
-    std::unordered_map<std::size_t, std::shared_ptr<HalfEdge>> visited_edges;
-    const auto& vi = v_new;
-    auto edgeji = vi->edge();
-    do {
-      const auto vj = edgeji->flip()->vertex();
-      auto edgekj = vj->edge();
-      do {
-        const auto min_edge = GetMinEdge(edgekj);
-        const auto min_edge_key = hash_value(*min_edge);
-        if (!visited_edges.contains(min_edge_key)) {
-          if (const auto iterator = valid_edges.find(min_edge_key); iterator != valid_edges.cend()) {
-            // invalidate existing edge contraction candidate in the priority queue
-            iterator->second->valid = false;
-          }
-          auto new_edge_contraction = CreateEdgeContraction(min_edge, quadrics);
-          valid_edges[min_edge_key] = new_edge_contraction;
-          edge_contractions.push(std::move(new_edge_contraction));
-          visited_edges.emplace(min_edge_key, min_edge);
-        }
-        edgekj = edgekj->next()->flip();
-      } while (edgekj != vj->edge());
-      edgeji = edgeji->next()->flip();
-    } while (edgeji != vi->edge());
+    std::unordered_set<HalfEdgeKey, gfx::HalfEdgeKey::HalfEdgeKeyHash, gfx::HalfEdgeKey::HalfEdgeKeyEqual> newEdge{};
+
+    for (const auto& face : info.newFaces) {
+      for (auto item : face.edges()) {
+        newEdge.emplace(item);
+        newEdge.emplace(item.swap());
+        valid_edges.erase(item.swap());
+        valid_edges.erase(item);
+        quadrics.erase(item.posTo());
+        quadrics.erase(item.pos());
+      }
+    }
+    for (const auto& edge : newEdge) {
+      quadrics[edge.pos()] = CreateErrorQuadric(half_edge_mesh.vertices().at(edge.pos()));
+      quadrics[edge.posTo()] = CreateErrorQuadric(half_edge_mesh.vertices().at(edge.posTo()));
+      if (!valid_edges.contains(edge) && !valid_edges.contains(edge.swap())) {
+        auto e = CreateEdgeContraction(edge, quadrics);
+        valid_edges.emplace(edge, e);
+        edge_contractions.emplace(e);
+      }
+    }
   }
 
   std::println(std::clog,

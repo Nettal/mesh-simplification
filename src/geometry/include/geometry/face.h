@@ -3,9 +3,11 @@
 
 #include <cassert>
 #include <memory>
+#include <vector>
 
 #include <glm/vec3.hpp>
 
+#include "HalfEdgeKey.h"
 #include "geometry/vertex.h"
 
 namespace gfx {
@@ -17,27 +19,9 @@ public:
    * \brief Initializes a face.
    * \param v0,v1,v2 The face vertices in counter-clockwise order.
    */
-  Face(const std::shared_ptr<Vertex>& v0,
-       const std::shared_ptr<Vertex>& v1,
-       const std::shared_ptr<Vertex>& v2) noexcept;
+  Face(const Vertex& a, const Vertex& b, const Vertex& c);
 
-  /** \brief Gets the first face vertex. */
-  [[nodiscard]] std::shared_ptr<Vertex> v0() const noexcept {
-    assert(!v0_.expired());
-    return v0_.lock();
-  }
-
-  /** \brief Gets the second face vertex. */
-  [[nodiscard]] std::shared_ptr<Vertex> v1() const noexcept {
-    assert(!v1_.expired());
-    return v1_.lock();
-  }
-
-  /** \brief Gets the third face vertex. */
-  [[nodiscard]] std::shared_ptr<Vertex> v2() const noexcept {
-    assert(!v2_.expired());
-    return v2_.lock();
-  }
+  [[nodiscard]] std::vector<Vertex> poses() const noexcept { return {a_, b_, c_}; }
 
   /** \brief Gets the face normal. */
   [[nodiscard]] const glm::vec3& normal() const noexcept { return normal_; }
@@ -45,20 +29,54 @@ public:
   /** \brief Gets the face area. */
   [[nodiscard]] float area() const noexcept { return area_; }
 
-  /** \brief Defines the face equality operator. */
-  friend bool operator==(const Face& lhs, const Face& rhs) noexcept {
-    return lhs.v0() == rhs.v0() && lhs.v1() == rhs.v1() && lhs.v2() == rhs.v2();
+  [[nodiscard]] std::vector<HalfEdgeKey> edges() const noexcept {
+    auto v1 = HalfEdgeKey(a_.position(), b_.position());
+    auto v2 = HalfEdgeKey(b_.position(), c_.position());
+    auto v3 = HalfEdgeKey(c_.position(), a_.position());
+    return {v1, v2, v3};
   }
 
-  /** \brief Gets the face hash value. */
-  friend std::size_t hash_value(const Face& face) noexcept { return hash_value(*face.v0(), *face.v1(), *face.v2()); }
+  [[nodiscard]] std::vector<Vertex> vertex() const noexcept { return {a_, b_, c_}; }
 
+  [[nodiscard]] Vertex getVertex(glm::vec3 p) const noexcept {
+    if (p == a_.position()) return a_;
+    if (p == b_.position()) return b_;
+    if (p == c_.position()) return c_;
+    assert(0);
+  }
+
+  Vertex a_;
+  Vertex b_;
+  Vertex c_;
 private:
-  std::weak_ptr<Vertex> v0_, v1_, v2_;
-  glm::vec3 normal_;
-  float area_;
+  glm::vec3 normal_{};
+  float area_{};
+};
+struct FaceHash {
+  std::size_t operator()(const Face& type) const {
+    int64_t result = 1;
+    result = 31 * result + *((int*)(&type.a_.position().x));
+    result = 31 * result + *((int*)(&type.a_.position().y));
+    result = 31 * result + *((int*)(&type.a_.position().z));
+    result = 31 * result + *((int*)(&type.b_.position().x));
+    result = 31 * result + *((int*)(&type.b_.position().y));
+    result = 31 * result + *((int*)(&type.b_.position().z));
+    result = 31 * result + *((int*)(&type.c_.position().x));
+    result = 31 * result + *((int*)(&type.c_.position().y));
+    result = 31 * result + *((int*)(&type.c_.position().z));
+    result = 31 * result + *((int*)(&type.normal().x));
+    result = 31 * result + *((int*)(&type.normal().y));
+    result = 31 * result + *((int*)(&type.normal().z));
+    return result;
+  }
 };
 
+struct FaceEqual {
+  bool operator()(const Face& lhs, const Face& rhs) const {
+    return lhs.a_.position() == rhs.a_.position() && lhs.b_.position() == rhs.b_.position()
+           && lhs.c_.position() == rhs.c_.position() && lhs.normal() == rhs.normal();
+  }
+};
 }  // namespace gfx
 
 #endif  // SRC_GEOMETRY_INCLUDE_GEOMETRY_FACE_H_
