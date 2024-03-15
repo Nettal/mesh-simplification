@@ -24,7 +24,7 @@ gfx::ArcCamera CreateCamera(const float aspect_ratio) {
 }
 
 gfx::Mesh CreateMesh(const gfx::Device& device) {
-  auto mesh = gfx::obj_loader::LoadMesh(device, "assets/models/bunny.obj");
+  auto mesh = gfx::obj_loader::LoadMesh(device, "../../../src/app/assets/models/bunny.obj");
   mesh.Translate(glm::vec3{0.2f, -0.3f, 0.0f});
   mesh.Rotate(glm::vec3{1.0f, 0.0f, 0.0f}, glm::radians(10.0f));
   mesh.Scale(glm::vec3{0.35f});
