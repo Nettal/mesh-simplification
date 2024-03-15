@@ -145,11 +145,12 @@ Mesh mesh::Simplify(const Device& device, const Mesh& mesh, const float rate) {
   // compute edge contraction candidates for each edge in the mesh
   for (const auto& face : half_edge_mesh.faces()) {
     for (const auto& edge : face.edges()) {
-      if (!valid_edges.contains(edge) || valid_edges.contains(edge.swap())) {
-        auto edge_contraction = CreateEdgeContraction(edge, quadrics);
-        edge_contractions.push(edge_contraction);
-        valid_edges.emplace(edge, edge_contraction);
+      if (valid_edges.contains(edge) || valid_edges.contains(edge.swap())) {
+        continue;
       }
+      auto edge_contraction = CreateEdgeContraction(edge, quadrics);
+      edge_contractions.push(edge_contraction);
+      valid_edges.emplace(edge, edge_contraction);
     }
   }
 
